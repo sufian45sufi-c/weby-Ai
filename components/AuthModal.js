@@ -1,168 +1,166 @@
-import Head from "next/head";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
-export default function Chat() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [checking, setChecking] = useState(true);
-  const bottomRef = useRef(null);
+export default function AuthModal({ isOpen, onClose, startInSignUp = false }) {
+  const [isSignUp, setIsSignUp] = useState(startInSignUp);
+  const [form, setForm] = useState({ username: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push("/");
-      } else {
-        setChecking(false);
-      }
-    });
-  }, [router]);
+    if (isOpen) {
+      setIsSignUp(startInSignUp);
+      setError("");
+    }
+  }, [isOpen, startInSignUp]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  if (!isOpen) return null;
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const sendMessage = () => {
-    const text = input.trim();
-    if (!text) return;
+  const handleSubmit = async () => {
+    setError("");
+    setLoading(true);
 
-    setMessages((prev) => [...prev, { sender: "user", text }]);
-    setInput("");
-
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "agent",
-          text: `I'm processing "${text}". As your Closed Agent, I'm analyzing the context and preparing the best architecture for this task.`,
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: { username: form.username },
         },
-      ]);
-    }, 600);
+      });
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      onClose();
+      router.push("/chat");
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      onClose();
+      router.push("/chat");
+    }
   };
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") sendMessage();
-  };
-
-  if (checking) return null;
 
   return (
-    <>
-      <Head>
-        <title>Chat | Closed Agent</title>
-        <link
-          href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@300;400;600&display=swap"
-          rel="stylesheet"
-        />
-      </Head>
-
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-neutral-900/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
-        className="bg-white text-neutral-900 min-h-screen flex flex-col"
-        style={{
-          fontFamily: "'Inter', sans-serif",
-          backgroundImage:
-            "linear-gradient(to right, #f0f0f0 1px, transparent 1px), linear-gradient(to bottom, #f0f0f0 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
-        }}
+        className="w-full max-w-md bg-white border border-neutral-200 p-8 md:p-12 shadow-xl rounded-lg relative"
+        onClick={(e) => e.stopPropagation()}
       >
-        <header className="fixed top-0 left-0 right-0 p-6 flex justify-between items-center bg-white/80 backdrop-blur-md z-50">
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-bold tracking-tight">Closed Agent</span>
-            <span className="text-[10px] text-neutral-400 uppercase tracking-widest px-2 py-0.5 border border-neutral-200 rounded-full">
-              v1.0
-            </span>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-sm font-medium">
-              Model: <span className="text-neutral-500">Agent-Core-4</span>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-neutral-900 transition-colors"
-            >
-              Log out
-            </button>
-          </div>
-        </header>
-
-        <main
-          className={`flex-1 overflow-y-auto pt-24 pb-40 px-6 flex flex-col items-center ${
-            messages.length === 0 ? "justify-center" : ""
-          }`}
+        <button
+          onClick={onClose}
+          className="absolute top-5 right-5 text-neutral-400 hover:text-neutral-900 transition-colors text-sm"
+          aria-label="Close"
         >
-          <div className="max-w-3xl w-full space-y-8">
-            {messages.length === 0 && (
-              <div className="text-center">
-                <h2
-                  className="text-5xl mb-12"
-                  style={{ fontFamily: "'EB Garamond', serif" }}
-                >
-                  How can I help you today?
-                </h2>
-              </div>
-            )}
+          ✕
+        </button>
 
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`max-w-2xl ${msg.sender === "user" ? "ml-auto" : ""}`}
-              >
-                <div className="text-[10px] uppercase tracking-widest text-neutral-400 mb-1">
-                  {msg.sender}
-                </div>
-                <div
-                  className={`text-sm leading-relaxed ${
-                    msg.sender === "user" ? "text-right" : ""
-                  }`}
-                >
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-            <div ref={bottomRef} />
+        <div className="mb-10 text-lg font-bold tracking-tight">Closed.</div>
+
+        <h1
+          className="text-4xl mb-8"
+          style={{ fontFamily: "'EB Garamond', serif" }}
+        >
+          {isSignUp ? "Create account." : "Welcome back."}
+        </h1>
+
+        {error && (
+          <div className="mb-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-4 py-3">
+            {error}
           </div>
-        </main>
+        )}
 
-        <div className="fixed bottom-6 left-0 right-0 px-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="relative bg-white border border-neutral-200 shadow-xl rounded-full p-2 flex items-center">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+          }}
+        >
+          {isSignUp && (
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-neutral-500 mb-2">
+                Username
+              </label>
               <input
                 type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type a message..."
-                className="flex-1 bg-transparent px-6 py-3 focus:outline-none text-sm"
+                name="username"
+                value={form.username}
+                onChange={handleChange}
+                className="w-full border border-neutral-200 bg-transparent px-4 py-3 rounded focus:outline-none focus:border-neutral-400 transition-colors"
+                placeholder="johndoe"
               />
-              <button
-                onClick={sendMessage}
-                className="bg-neutral-900 text-white p-3 rounded-full hover:bg-neutral-700 transition-all mr-1"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M5 12h14M12 5l7 7-7 7"
-                  ></path>
-                </svg>
-              </button>
             </div>
+          )}
+
+          <div>
+            <label className="block text-[10px] uppercase tracking-widest text-neutral-500 mb-2">
+              Email
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              className="w-full border border-neutral-200 bg-transparent px-4 py-3 rounded focus:outline-none focus:border-neutral-400 transition-colors"
+              placeholder="name@example.com"
+            />
           </div>
+
+          <div>
+            <label className="block text-[10px] uppercase tracking-widest text-neutral-500 mb-2">
+              Password
+            </label>
+            <input
+              type="password"
+              name="password"
+              value={form.password}
+              onChange={handleChange}
+              className="w-full border border-neutral-200 bg-transparent px-4 py-3 rounded focus:outline-none focus:border-neutral-400 transition-colors"
+              placeholder="••••••••"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-neutral-900 text-white py-3 rounded hover:bg-neutral-700 transition-all text-sm font-medium disabled:opacity-60"
+          >
+            {loading ? "Please wait..." : "Continue"}
+          </button>
+        </form>
+
+        <div className="mt-8 pt-8 border-t border-neutral-100 text-center">
+          <p className="text-xs text-neutral-500">
+            {isSignUp ? "Already have an account? " : "Don't have an account? "}
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-neutral-900 underline underline-offset-4 font-medium"
+            >
+              {isSignUp ? "Log in" : "Sign up"}
+            </button>
+          </p>
         </div>
       </div>
-    </>
+    </div>
   );
 }
