@@ -1,3 +1,4 @@
+import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 
 export default function AuthModal({ isOpen, onClose, startInSignUp = false }) {
