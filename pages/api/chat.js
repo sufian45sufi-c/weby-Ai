@@ -9,6 +9,7 @@ const MAX_PER_DAY = 150;
 function checkRateLimit(userId) {
   const now = Date.now();
   let entry = rateLimitStore.get(userId);
+
   if (!entry) {
     entry = { minuteCount: 0, minuteReset: now + 60_000, dayCount: 0, dayReset: now + 86_400_000 };
   }
@@ -51,9 +52,9 @@ Formatting rules you must always follow:
 `;
 
 const PERSONA_PROMPTS = {
-  thread: `You are Thread 1.0, an ultra-fast assistant. Prioritize speed and directness — give the shortest correct answer that fully satisfies the request. Skip preamble.`,
-  pixel: `You are Pixel 1.0, a sharp and structured assistant that specializes in code. When writing code, produce clean, correct, production-quality code with proper structure and naming. Explain your code briefly before or after the block, not inside it. Be precise and technical.`,
-  cell: `You are Cell 1.0, a creative, multi-step reasoning assistant. Break complex requests into clear steps, think through tradeoffs, and offer thoughtful, well-rounded answers. You're comfortable with open-ended, ambiguous, or creative tasks.`,
+  thread: `You are Thread 1.0, an ultra-fast assistant built by Fabian. Prioritize speed and directness — give the shortest correct answer that fully satisfies the request. Skip preamble.`,
+  pixel: `You are Pixel 1.0, a sharp and structured assistant built by Fabian that specializes in code. When writing code, produce clean, correct, production-quality code with proper structure and naming. Explain your code briefly before or after the block, not inside it. Be precise and technical.`,
+  cell: `You are Cell 1.0, a creative, multi-step reasoning assistant built by Fabian. Break complex requests into clear steps, think through tradeoffs, and offer thoughtful, well-rounded answers. You're comfortable with open-ended, ambiguous, or creative tasks.`,
 };
 
 export default async function handler(req, res) {
@@ -70,7 +71,9 @@ export default async function handler(req, res) {
     persona = "pixel",
   } = req.body;
 
-  if (!userId) return res.status(401).json({ error: "Missing user identity." });
+  if (!userId) {
+    return res.status(401).json({ error: "Missing user identity." });
+  }
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "Messages array is required" });
   }
@@ -85,6 +88,7 @@ export default async function handler(req, res) {
   const personaPrompt = PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.pixel;
 
   let systemContent = `${personaPrompt}\n\n${FORMATTING_INSTRUCTIONS}`;
+
   if (memorySummary && memorySummary.trim()) {
     systemContent += `\n\nWhat you remember about this user from previous conversations:\n${memorySummary}`;
   }
@@ -101,6 +105,7 @@ export default async function handler(req, res) {
       model,
       stream: true,
     };
+
     if (isReasoningModel) {
       requestParams.reasoning_format = thinking ? "raw" : "hidden";
     }
@@ -109,8 +114,11 @@ export default async function handler(req, res) {
 
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || "";
-      if (content) res.write(content);
+      if (content) {
+        res.write(content);
+      }
     }
+
     res.end();
   } catch (err) {
     console.error(err);
