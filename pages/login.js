@@ -18,7 +18,7 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>{isSignUp ? "Sign Up" : "Login"} | Weby AI</title>
+        <title>{isSignUp ? "Sign Up" : "Login"} | Fabion AI</title>
         <link
           href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@300;400;600&display=swap"
           rel="stylesheet"
