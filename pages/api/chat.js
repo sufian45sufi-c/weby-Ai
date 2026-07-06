@@ -9,7 +9,6 @@ const MAX_PER_DAY = 150;
 function checkRateLimit(userId) {
   const now = Date.now();
   let entry = rateLimitStore.get(userId);
-
   if (!entry) {
     entry = { minuteCount: 0, minuteReset: now + 60_000, dayCount: 0, dayReset: now + 86_400_000 };
   }
@@ -35,7 +34,7 @@ function checkRateLimit(userId) {
   return { allowed: true };
 }
 
-const MODEL_MAP = {
+const EFFORT_MODEL_MAP = {
   low: "llama-3.1-8b-instant",
   medium: "llama-3.3-70b-versatile",
   high: "llama-3.3-70b-versatile",
@@ -43,27 +42,35 @@ const MODEL_MAP = {
   max: "deepseek-r1-distill-llama-70b",
 };
 
-const REASONING_START = "\u0002";
-const REASONING_END = "\u0003";
-
 const FORMATTING_INSTRUCTIONS = `
 Formatting rules you must always follow:
-- Write in clear, flowing prose. Do not default to bullet-point lists unless the user asks for a list or is comparing distinct items.
-- Use **bold** (double asterisks) only around genuinely important terms, names, or conclusions — not entire sentences, not every heading.
+- Write in clear, flowing prose. Avoid bullet-point lists unless the user asks for a list or is comparing distinct items.
+- Use **bold** (double asterisks) only around genuinely important terms, names, or conclusions — never entire sentences.
 - Never use single asterisks for emphasis.
-- Keep paragraphs short and readable.
+- When you write code, always use a fenced code block with the language name, like: \`\`\`javascript ... \`\`\`. Never show code inline without fencing it.
 `;
+
+const PERSONA_PROMPTS = {
+  thread: `You are Thread 1.0, an ultra-fast assistant. Prioritize speed and directness — give the shortest correct answer that fully satisfies the request. Skip preamble.`,
+  pixel: `You are Pixel 1.0, a sharp and structured assistant that specializes in code. When writing code, produce clean, correct, production-quality code with proper structure and naming. Explain your code briefly before or after the block, not inside it. Be precise and technical.`,
+  cell: `You are Cell 1.0, a creative, multi-step reasoning assistant. Break complex requests into clear steps, think through tradeoffs, and offer thoughtful, well-rounded answers. You're comfortable with open-ended, ambiguous, or creative tasks.`,
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { messages, userId, effort = "medium", thinking = false, memorySummary = "" } = req.body;
+  const {
+    messages,
+    userId,
+    effort = "medium",
+    thinking = false,
+    memorySummary = "",
+    persona = "pixel",
+  } = req.body;
 
-  if (!userId) {
-    return res.status(401).json({ error: "Missing user identity." });
-  }
+  if (!userId) return res.status(401).json({ error: "Missing user identity." });
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "Messages array is required" });
   }
@@ -73,11 +80,11 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: rateCheck.reason });
   }
 
-  const model = MODEL_MAP[effort] || MODEL_MAP.medium;
+  const model = EFFORT_MODEL_MAP[effort] || EFFORT_MODEL_MAP.medium;
   const isReasoningModel = effort === "extra" || effort === "max";
+  const personaPrompt = PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.pixel;
 
-  let systemContent = `You are Closed Agent, an AI assistant powered by Groq's fast inference. Be helpful, clear, and accurate. Use the full conversation history to stay consistent and remember what the user has told you earlier in this chat.\n\n${FORMATTING_INSTRUCTIONS}`;
-
+  let systemContent = `${personaPrompt}\n\n${FORMATTING_INSTRUCTIONS}`;
   if (memorySummary && memorySummary.trim()) {
     systemContent += `\n\nWhat you remember about this user from previous conversations:\n${memorySummary}`;
   }
@@ -94,7 +101,6 @@ export default async function handler(req, res) {
       model,
       stream: true,
     };
-
     if (isReasoningModel) {
       requestParams.reasoning_format = thinking ? "raw" : "hidden";
     }
@@ -102,15 +108,9 @@ export default async function handler(req, res) {
     const stream = await groq.chat.completions.create(requestParams);
 
     for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta || {};
-      if (delta.reasoning) {
-        res.write(REASONING_START + delta.reasoning + REASONING_END);
-      }
-      if (delta.content) {
-        res.write(delta.content);
-      }
+      const content = chunk.choices[0]?.delta?.content || "";
+      if (content) res.write(content);
     }
-
     res.end();
   } catch (err) {
     console.error(err);
