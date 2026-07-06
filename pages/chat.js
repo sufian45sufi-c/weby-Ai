@@ -9,12 +9,11 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [checking, setChecking] = useState(true);
-  const [isTyping, setIsTyping] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [userId, setUserId] = useState(null);
   const bottomRef = useRef(null);
   const router = useRouter();
 
-  // Auth check + load saved history
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -37,12 +36,12 @@ export default function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Save whenever messages change (after initial load)
+  // Save to Firebase only once streaming has finished (avoids a write per token)
   useEffect(() => {
-    if (!userId || checking) return;
+    if (!userId || checking || isStreaming) return;
     const convoRef = ref(db, `conversations/${userId}`);
     set(convoRef, { messages, updatedAt: Date.now() });
-  }, [messages, userId, checking]);
+  }, [messages, userId, checking, isStreaming]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -59,7 +58,10 @@ export default function Chat() {
 
     setMessages((prev) => [...prev, { sender: "user", text }]);
     setInput("");
-    setIsTyping(true);
+    setIsStreaming(true);
+
+    // Add an empty placeholder message for the agent that we'll fill in as chunks arrive
+    setMessages((prev) => [...prev, { sender: "agent", text: "" }]);
 
     try {
       const res = await fetch("/api/chat", {
@@ -68,19 +70,33 @@ export default function Chat() {
         body: JSON.stringify({ message: text }),
       });
 
-      const data = await res.json();
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
 
-      setMessages((prev) => [
-        ...prev,
-        { sender: "agent", text: data.reply || "Something went wrong." },
-      ]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        accumulated += decoder.decode(value, { stream: true });
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { sender: "agent", text: accumulated };
+          return updated;
+        });
+      }
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { sender: "agent", text: "Error reaching the agent. Please try again." },
-      ]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          sender: "agent",
+          text: "Error reaching the agent. Please try again.",
+        };
+        return updated;
+      });
     } finally {
-      setIsTyping(false);
+      setIsStreaming(false);
     }
   };
 
@@ -161,23 +177,19 @@ export default function Chat() {
                   {msg.sender}
                 </div>
                 <div
-                  className={`text-sm leading-relaxed ${
+                  className={`text-sm leading-relaxed whitespace-pre-wrap ${
                     msg.sender === "user" ? "text-right" : ""
                   }`}
                 >
                   {msg.text}
+                  {isStreaming &&
+                    msg.sender === "agent" &&
+                    i === messages.length - 1 && (
+                      <span className="inline-block w-1.5 h-4 bg-neutral-900 ml-1 animate-pulse align-middle" />
+                    )}
                 </div>
               </div>
             ))}
-
-            {isTyping && (
-              <div className="max-w-2xl">
-                <div className="text-[10px] uppercase tracking-widest text-neutral-400 mb-1">
-                  agent
-                </div>
-                <div className="text-sm text-neutral-400 italic">Thinking...</div>
-              </div>
-            )}
 
             <div ref={bottomRef} />
           </div>
@@ -196,7 +208,8 @@ export default function Chat() {
               />
               <button
                 onClick={sendMessage}
-                className="bg-neutral-900 text-white p-3 rounded-full hover:bg-neutral-700 transition-all mr-1"
+                disabled={isStreaming}
+                className="bg-neutral-900 text-white p-3 rounded-full hover:bg-neutral-700 transition-all mr-1 disabled:opacity-50"
               >
                 <svg
                   className="w-5 h-5"
