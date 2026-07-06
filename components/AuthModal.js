@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { supabase } from "../lib/supabaseClient";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../lib/firebaseClient";
 
 export default function AuthModal({ isOpen, onClose, startInSignUp = false }) {
   const [isSignUp, setIsSignUp] = useState(startInSignUp);
@@ -26,33 +31,25 @@ export default function AuthModal({ isOpen, onClose, startInSignUp = false }) {
     setError("");
     setLoading(true);
 
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: {
-          data: { username: form.username },
-        },
-      });
-      setLoading(false);
-      if (error) {
-        setError(error.message);
-        return;
+    try {
+      if (isSignUp) {
+        const cred = await createUserWithEmailAndPassword(
+          auth,
+          form.email,
+          form.password
+        );
+        if (form.username) {
+          await updateProfile(cred.user, { displayName: form.username });
+        }
+      } else {
+        await signInWithEmailAndPassword(auth, form.email, form.password);
       }
       onClose();
       router.push("/chat");
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
-      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setLoading(false);
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      onClose();
-      router.push("/chat");
     }
   };
 
