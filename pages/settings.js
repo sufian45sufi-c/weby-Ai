@@ -51,7 +51,7 @@ export default function Settings() {
   return (
     <>
       <Head>
-        <title>Settings | Closed Agent</title>
+        <title>Settings | Fabion</title>
         <link
           href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@300;400;600&display=swap"
           rel="stylesheet"
