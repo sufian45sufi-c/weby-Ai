@@ -10,6 +10,91 @@ function deriveTitle(text) {
   return trimmed.length > 40 ? trimmed.slice(0, 40) + "…" : trimmed;
 }
 
+function CodeBlock({ code, language }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleDownload = () => {
+    const extMap = {
+      javascript: "js", js: "js", python: "py", html: "html", css: "css",
+      json: "json", typescript: "ts", jsx: "jsx", tsx: "tsx", bash: "sh", shell: "sh",
+    };
+    const ext = extMap[language?.toLowerCase()] || "txt";
+    const blob = new Blob([code], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `snippet.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="my-3 rounded-lg overflow-hidden border border-neutral-800">
+      <div className="flex items-center justify-between bg-neutral-800 px-4 py-2">
+        <span className="text-[10px] uppercase tracking-widest text-neutral-400">
+          {language || "code"}
+        </span>
+        <div className="flex gap-3">
+          <button
+            onClick={handleCopy}
+            className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-white transition-colors"
+          >
+            {copied ? "Copied ✓" : "Copy"}
+          </button>
+          <button
+            onClick={handleDownload}
+            className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-white transition-colors"
+          >
+            Download
+          </button>
+        </div>
+      </div>
+      <pre className="bg-neutral-900 text-neutral-100 p-4 overflow-x-auto text-xs leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function FormattedText({ text }) {
+  const segments = text.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <>
+      {segments.map((segment, i) => {
+        if (segment.startsWith("```")) {
+          const match = segment.match(/```(\w+)?\n?([\s\S]*?)```/);
+          const language = match?.[1] || "";
+          const code = (match?.[2] || segment.replace(/```/g, "")).trim();
+          return <CodeBlock key={i} code={code} language={language} />;
+        }
+
+        const boldParts = segment.split(/(\*\*[^*]+\*\*)/g);
+        return (
+          <span key={i}>
+            {boldParts.map((part, j) =>
+              part.startsWith("**") && part.endsWith("**") ? (
+                <strong key={j}>{part.slice(2, -2)}</strong>
+              ) : (
+                <span key={j}>{part}</span>
+              )
+            )}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+const REASONING_START = "\u0002";
+const REASONING_END = "\u0003";
+
 export default function Chat() {
   const [userId, setUserId] = useState(null);
   const [checking, setChecking] = useState(true);
@@ -21,6 +106,11 @@ export default function Chat() {
 
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+
+  const [effort, setEffort] = useState("medium");
+  const [thinking, setThinking] = useState(false);
+  const [persona, setPersona] = useState("pixel");
+  const [memorySummary, setMemorySummary] = useState("");
 
   const bottomRef = useRef(null);
   const router = useRouter();
@@ -35,11 +125,9 @@ export default function Chat() {
 
       const convosRef = ref(db, `conversations/${user.uid}`);
       const snap = await get(convosRef);
-
       if (snap.exists()) {
         const data = snap.val();
         setChatsData(data);
-
         const sortedIds = Object.keys(data).sort(
           (a, b) => (data[b].updatedAt || 0) - (data[a].updatedAt || 0)
         );
@@ -48,6 +136,19 @@ export default function Chat() {
           setActiveChatId(mostRecent);
           setMessages(data[mostRecent].messages || []);
         }
+      }
+
+      const settingsSnap = await get(ref(db, `settings/${user.uid}`));
+      if (settingsSnap.exists()) {
+        const s = settingsSnap.val();
+        setEffort(s.effort || "medium");
+        setThinking(!!s.thinking);
+        setPersona(s.persona || "pixel");
+      }
+
+      const memSnap = await get(ref(db, `memory/${user.uid}`));
+      if (memSnap.exists()) {
+        setMemorySummary(memSnap.val().summary || "");
       }
 
       setChecking(false);
@@ -102,22 +203,32 @@ export default function Chat() {
 
     setInput("");
     setIsStreaming(true);
-    setMessages((prev) => [...prev, { sender: "user", text }, { sender: "agent", text: "" }]);
+    setMessages((prev) => [
+      ...prev,
+      { sender: "user", text },
+      { sender: "agent", text: "", reasoning: "" },
+    ]);
 
     let accumulated = "";
+    let reasoningAccumulated = "";
 
     try {
-      const conversationHistory = [...priorMessages, { sender: "user", text }].map(
-        (m) => ({
-          role: m.sender === "user" ? "user" : "assistant",
-          content: m.text,
-        })
-      );
+      const conversationHistory = [...priorMessages, { sender: "user", text }].map((m) => ({
+        role: m.sender === "user" ? "user" : "assistant",
+        content: m.text,
+      }));
 
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: conversationHistory, userId }),
+        body: JSON.stringify({
+          messages: conversationHistory,
+          userId,
+          effort,
+          thinking,
+          memorySummary,
+          persona,
+        }),
       });
 
       if (res.status === 429) {
@@ -133,16 +244,38 @@ export default function Chat() {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
+      let inReasoning = false;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        accumulated += decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
+
+        let output = "";
+        for (let i = 0; i < buffer.length; i++) {
+          const ch = buffer[i];
+          if (ch === REASONING_START) {
+            inReasoning = true;
+          } else if (ch === REASONING_END) {
+            inReasoning = false;
+          } else if (inReasoning) {
+            reasoningAccumulated += ch;
+          } else {
+            output += ch;
+          }
+        }
+        buffer = "";
+        accumulated += output;
 
         setMessages((prev) => {
           const updated = [...prev];
-          updated[updated.length - 1] = { sender: "agent", text: accumulated };
+          updated[updated.length - 1] = {
+            sender: "agent",
+            text: accumulated,
+            reasoning: reasoningAccumulated,
+          };
           return updated;
         });
       }
@@ -160,192 +293,9 @@ export default function Chat() {
         const finalMessages = [
           ...priorMessages,
           { sender: "user", text },
-          { sender: "agent", text: accumulated },
+          { sender: "agent", text: accumulated, reasoning: reasoningAccumulated },
         ];
 
         const existing = chatsData[chatId];
         const title = isNewChat ? deriveTitle(text) : existing?.title || deriveTitle(text);
-        const createdAt = existing?.createdAt || Date.now();
-        const updatedAt = Date.now();
-
-        await set(ref(db, `conversations/${userId}/${chatId}`), {
-          title,
-          messages: finalMessages,
-          createdAt,
-          updatedAt,
-        });
-
-        setChatsData((prev) => ({
-          ...prev,
-          [chatId]: { title, messages: finalMessages, createdAt, updatedAt },
-        }));
-      }
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") sendMessage();
-  };
-
-  if (checking) return null;
-
-  return (
-    <>
-      <Head>
-        <title>Chat | Closed Agent</title>
-        <link
-          href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@300;400;600&display=swap"
-          rel="stylesheet"
-        />
-      </Head>
-
-      <div
-        className="flex h-screen bg-white text-neutral-900"
-        style={{ fontFamily: "'Inter', sans-serif" }}
-      >
-        <aside className="w-72 border-r border-neutral-200 flex flex-col h-screen shrink-0">
-          <div className="p-6 border-b border-neutral-200">
-            <div
-              className="text-lg font-bold tracking-tight mb-4"
-              style={{ fontFamily: "'EB Garamond', serif" }}
-            >
-              Closed.
-            </div>
-            <button
-              onClick={handleNewChat}
-              className="w-full bg-neutral-900 text-white text-xs uppercase tracking-widest py-2.5 rounded-full hover:bg-neutral-700 transition-all"
-            >
-              + New chat
-            </button>
-          </div>
-
-          <div className="p-4">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search chats..."
-              className="w-full border border-neutral-200 bg-transparent px-4 py-2 rounded-full text-sm focus:outline-none focus:border-neutral-400 transition-colors"
-            />
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-2 pb-4">
-            {chatList.length === 0 && (
-              <div className="text-xs text-neutral-400 px-4 py-2">
-                {searchQuery ? "No chats found" : "No chats yet"}
-              </div>
-            )}
-            {chatList.map((chat) => (
-              <button
-                key={chat.id}
-                onClick={() => handleSelectChat(chat.id)}
-                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm truncate mb-1 transition-colors ${
-                  chat.id === activeChatId
-                    ? "bg-neutral-100 font-medium"
-                    : "hover:bg-neutral-50 text-neutral-600"
-                }`}
-              >
-                {chat.title}
-              </button>
-            ))}
-          </div>
-
-          <div className="p-4 border-t border-neutral-200">
-            <button
-              onClick={handleLogout}
-              className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-neutral-900 transition-colors"
-            >
-              Log out
-            </button>
-          </div>
-        </aside>
-
-        <div className="flex-1 flex flex-col h-screen">
-          <header className="shrink-0 p-6 flex justify-between items-center border-b border-neutral-100">
-            <div className="text-sm font-medium">
-              Model: <span className="text-neutral-500">Agent-Core-4</span>
-            </div>
-          </header>
-
-          <main
-            className={`flex-1 overflow-y-auto px-6 py-8 flex flex-col items-center ${
-              messages.length === 0 ? "justify-center" : ""
-            }`}
-          >
-            <div className="max-w-3xl w-full space-y-8">
-              {messages.length === 0 && (
-                <div className="text-center">
-                  <h2
-                    className="text-5xl mb-12"
-                    style={{ fontFamily: "'EB Garamond', serif" }}
-                  >
-                    How can I help you today?
-                  </h2>
-                </div>
-              )}
-
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`max-w-2xl ${msg.sender === "user" ? "ml-auto" : ""}`}
-                >
-                  <div className="text-[10px] uppercase tracking-widest text-neutral-400 mb-1">
-                    {msg.sender}
-                  </div>
-                  <div
-                    className={`text-sm leading-relaxed whitespace-pre-wrap ${
-                      msg.sender === "user" ? "text-right" : ""
-                    }`}
-                  >
-                    {msg.text}
-                    {isStreaming &&
-                      msg.sender === "agent" &&
-                      i === messages.length - 1 && (
-                        <span className="inline-block w-1.5 h-4 bg-neutral-900 ml-1 animate-pulse align-middle" />
-                      )}
-                  </div>
-                </div>
-              ))}
-
-              <div ref={bottomRef} />
-            </div>
-          </main>
-
-          <div className="shrink-0 px-6 pb-6">
-            <div className="max-w-4xl mx-auto">
-              <div className="relative bg-white border border-neutral-200 shadow-xl rounded-full p-2 flex items-center">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type a message..."
-                  className="flex-1 bg-transparent px-6 py-3 focus:outline-none text-sm"
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={isStreaming}
-                  className="bg-neutral-900 text-white p-3 rounded-full hover:bg-neutral-700 transition-all mr-1 disabled:opacity-50"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M5 12h14M12 5l7 7-7 7"
-                    ></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
+        const
