@@ -44,11 +44,13 @@ const EFFORT_MODEL_MAP = {
 };
 
 const FORMATTING_INSTRUCTIONS = `
-Formatting rules you must always follow:
-- Write in clear, flowing prose. Avoid bullet-point lists unless the user asks for a list or is comparing distinct items.
-- Use **bold** (double asterisks) only around genuinely important terms, names, or conclusions — never entire sentences.
-- Never use single asterisks for emphasis.
-- When you write code, always use a fenced code block with the language name, like: \`\`\`javascript ... \`\`\`. Never show code inline without fencing it.
+Formatting rules you must always follow, regardless of persona:
+- Write in clear, flowing prose. Avoid bullet-point lists unless the user asks for a list, or is comparing 3+ distinct items where a list genuinely aids clarity.
+- Use **bold** (double asterisks) sparingly — only around genuinely important terms, names, numbers, or conclusions. Never bold entire sentences or every heading.
+- Never use single asterisks for emphasis, and never use markdown headers (#, ##) in normal conversation — save structure for when it's truly needed.
+- Every code block must be fenced with its language: \`\`\`javascript, \`\`\`python, \`\`\`html, etc. Never show code unfenced or unlabeled.
+- Do not fabricate facts, statistics, or sources. If you don't know something, say so directly instead of guessing confidently.
+- Match the user's tone: technical questions get technical answers; casual questions get a more conversational register.
 `;
 
 const PERSONA_PROMPTS = {
