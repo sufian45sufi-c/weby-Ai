@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 
-export function CodeBlock({ code, language, onOpenCanvas }) {
+export function CodeBlock({ code, language, onCopyOnly, onOpenWorkspace }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -32,10 +32,10 @@ export function CodeBlock({ code, language, onOpenCanvas }) {
         </span>
         <div className="flex gap-3">
           <button
-            onClick={() => onOpenCanvas(code, language)}
+            onClick={onOpenWorkspace}
             className="text-[10px] uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
           >
-            Open editor
+            Open in editor
           </button>
           <button
             onClick={handleCopy}
@@ -58,17 +58,47 @@ export function CodeBlock({ code, language, onOpenCanvas }) {
   );
 }
 
-export function FormattedText({ text, onOpenCanvas }) {
-  const segments = text.split(/(```[\s\S]*?```)/g);
+const EXT_LANGUAGE_MAP = {
+  html: "html", css: "css", js: "javascript", jsx: "javascript",
+  ts: "typescript", tsx: "typescript", py: "python", json: "json", md: "markdown",
+};
+
+function parseCodeBlocks(text) {
+  const blockRegex = /```([a-zA-Z]*)(?::([^\n`]+))?\n?([\s\S]*?)```/g;
+  const blocks = [];
+  let match;
+  let counter = 0;
+  while ((match = blockRegex.exec(text)) !== null) {
+    const language = (match[1] || "").toLowerCase();
+    const explicitName = match[2]?.trim();
+    const code = match[3].trim();
+    counter += 1;
+    const ext = Object.keys(EXT_LANGUAGE_MAP).find((k) => EXT_LANGUAGE_MAP[k] === language) || language || "txt";
+    const filename = explicitName || `file${counter}.${ext || "txt"}`;
+    blocks.push({ filename, language: language || "text", code, raw: match[0] });
+  }
+  return blocks;
+}
+
+export function FormattedText({ text, onOpenWorkspace }) {
+  const blocks = parseCodeBlocks(text);
+  const segments = text.split(/(```[a-zA-Z]*(?::[^\n`]+)?\n?[\s\S]*?```)/g);
+  let blockIndex = 0;
+
   return (
     <>
       {segments.map((segment, i) => {
         if (segment.startsWith("```")) {
-          const match = segment.match(/```(\w+)?\n?([\s\S]*?)```/);
-          const language = match?.[1] || "";
-          const code = (match?.[2] || segment.replace(/```/g, "")).trim();
+          const block = blocks[blockIndex];
+          blockIndex += 1;
+          if (!block) return null;
           return (
-            <CodeBlock key={i} code={code} language={language} onOpenCanvas={onOpenCanvas} />
+            <CodeBlock
+              key={i}
+              code={block.code}
+              language={block.language}
+              onOpenWorkspace={() => onOpenWorkspace(blocks, block.filename)}
+            />
           );
         }
         const boldParts = segment.split(/(\*\*[^*]+\*\*)/g);
@@ -85,75 +115,6 @@ export function FormattedText({ text, onOpenCanvas }) {
         );
       })}
     </>
-  );
-}
-
-const PREVIEWABLE = ["html", "css"];
-
-export function CanvasPanel({ code, language, onChange, onClose }) {
-  const [tab, setTab] = useState("preview");
-  const canPreview = PREVIEWABLE.includes((language || "").toLowerCase());
-
-  const previewDoc = useMemo(() => {
-    if (!canPreview) return "";
-    if (language.toLowerCase() === "html") return code;
-    return `<html><head><style>${code}</style></head><body><p style="font-family:sans-serif;color:#888;padding:2rem;">CSS preview — add matching HTML to see it fully rendered.</p></body></html>`;
-  }, [code, language, canPreview]);
-
-  return (
-    <div className="w-[45%] min-w-[360px] border-l border-zinc-800 flex flex-col h-screen shrink-0 bg-zinc-950">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium uppercase tracking-widest text-zinc-400">
-            {language || "code"}
-          </span>
-          {canPreview && (
-            <div className="flex rounded-full border border-zinc-800 overflow-hidden text-[10px]">
-              <button
-                onClick={() => setTab("preview")}
-                className={`px-3 py-1 uppercase tracking-widest transition-colors ${
-                  tab === "preview" ? "bg-white text-black" : "text-zinc-400"
-                }`}
-              >
-                Preview
-              </button>
-              <button
-                onClick={() => setTab("code")}
-                className={`px-3 py-1 uppercase tracking-widest transition-colors ${
-                  tab === "code" ? "bg-white text-black" : "text-zinc-400"
-                }`}
-              >
-                Code
-              </button>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={onClose}
-          className="text-zinc-500 hover:text-white transition-colors text-sm"
-        >
-          ✕
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-hidden">
-        {canPreview && tab === "preview" ? (
-          <iframe
-            title="preview"
-            srcDoc={previewDoc}
-            sandbox=""
-            className="w-full h-full bg-white"
-          />
-        ) : (
-          <textarea
-            value={code}
-            onChange={(e) => onChange(e.target.value)}
-            spellCheck={false}
-            className="w-full h-full p-4 bg-zinc-950 text-zinc-100 text-xs font-mono leading-relaxed resize-none focus:outline-none"
-          />
-        )}
-      </div>
-    </div>
   );
 }
 
