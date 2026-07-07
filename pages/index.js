@@ -1,50 +1,56 @@
 import Head from "next/head";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthModal from "../components/AuthModal";
 
 export default function Home() {
-  const [email, setEmail] = useState("");
+  const [scrolled, setScrolled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState(false); // false = login, true = signup
+  const [authMode, setAuthMode] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
     <>
       <Head>
-        <title>Fabion | Agentic Intelligence</title>
+        <title>Fabion | AI Agent</title>
         <link
-          href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@300;400;600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital@1&family=Inter:wght@300;400;500;600&display=swap"
           rel="stylesheet"
         />
       </Head>
 
       <div
-        className="bg-white text-neutral-900 min-h-screen selection:bg-neutral-900 selection:text-white"
-        style={{
-          fontFamily: "'Inter', sans-serif",
-          backgroundImage:
-            "linear-gradient(to right, #f0f0f0 1px, transparent 1px), linear-gradient(to bottom, #f0f0f0 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
-        }}
+        className="bg-[#0c0c0c] text-white min-h-screen selection:bg-white selection:text-black antialiased"
+        style={{ fontFamily: "'Inter', sans-serif" }}
       >
-        {/* Nav */}
-        <nav className="fixed top-6 left-6 right-6 md:left-1/2 md:-translate-x-1/2 md:w-[600px] backdrop-blur-md bg-white/60 border border-neutral-200/50 rounded-full px-6 py-3 shadow-sm z-50 flex justify-between items-center">
-          <div className="text-lg font-bold tracking-tight">Fabion</div>
-          <div className="hidden md:flex gap-8 text-[11px] uppercase tracking-[0.2em] font-medium text-neutral-500">
-            <a href="#features" className="hover:text-neutral-900 transition-colors">
-              Features
-            </a>
-            <a href="#waitlist" className="hover:text-neutral-900 transition-colors">
-              Waitlist
-            </a>
+        <nav
+          className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between px-6 py-2 rounded-full border border-[#1f1f1f] transition-all duration-500 backdrop-blur-xl ${
+            scrolled ? "bg-[#0c0c0c]/80 w-[90%] md:w-[700px] shadow-2xl" : "bg-[#0c0c0c]/40 w-[90%] md:w-[700px]"
+          }`}
+        >
+          <div className="font-bold tracking-tighter text-sm cursor-pointer px-2">FABION</div>
+          <div className="hidden md:flex gap-6 text-[10px] uppercase tracking-widest text-[#9A9A9A]">
+            {["Models", "Features", "Demo"].map((item) => (
+              
+                key={item}
+                href={`#${item.toLowerCase()}`}
+                className="hover:text-white transition-colors duration-300"
+              >
+                {item}
+              </a>
+            ))}
           </div>
-          <div className="flex items-center gap-3">
-           <button
-  onClick={() => {
-    alert("Sign Up clicked!");
-    setAuthMode(true);
-    setAuthOpen(true);
-  }}
-              className="text-[10px] uppercase tracking-widest hover:text-neutral-500 transition-colors"
+          <div className="flex gap-4 items-center">
+            <button
+              onClick={() => {
+                setAuthMode(false);
+                setAuthOpen(true);
+              }}
+              className="text-[10px] uppercase tracking-widest text-[#9A9A9A] hover:text-white transition-colors"
             >
               Sign In
             </button>
@@ -53,126 +59,121 @@ export default function Home() {
                 setAuthMode(true);
                 setAuthOpen(true);
               }}
-              className="bg-neutral-900 text-white text-[10px] px-4 py-2 rounded-full uppercase tracking-widest hover:bg-neutral-700 transition-all"
+              className="text-[10px] uppercase tracking-widest bg-white text-black px-4 py-1.5 rounded-full hover:bg-gray-200 transition-all"
             >
               Sign Up
             </button>
           </div>
         </nav>
 
-        <main className="max-w-5xl mx-auto pt-48 px-6 pb-24">
-          {/* Hero */}
-          <div className="mb-32">
-            <h1
-              className="text-7xl md:text-9xl tracking-tight mb-8"
-              style={{ fontFamily: "'EB Garamond', serif" }}
-            >
-              Agentic
-              <br />
-              Intelligence.
-            </h1>
-            <p className="text-xl md:text-2xl text-neutral-500 font-light max-w-xl leading-relaxed">
-              The core architecture for the agentic future. Built for speed,
-              designed for the creator, and scaled for production.
-            </p>
-          </div>
-
-          {/* Features */}
-          <section
-            id="features"
-            className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-32"
+        <section id="hero" className="min-h-screen flex flex-col justify-center items-center px-6 pt-20">
+          <h1
+            className="text-[80px] md:text-[140px] italic leading-[0.9] mb-8 text-center"
+            style={{ fontFamily: "'EB Garamond', serif" }}
           >
-            <div className="md:col-span-2 border border-neutral-200 p-10 bg-white/50 h-80 flex flex-col justify-end rounded-lg">
-              <h3
-                className="text-3xl mb-3"
-                style={{ fontFamily: "'EB Garamond', serif" }}
-              >
-                Sub-Second Inference
-              </h3>
-              <p className="text-sm text-neutral-500 max-w-sm">
-                Powered by Groq, Fabion delivers near-instant response
-                times for complex agent decision-making.
-              </p>
-            </div>
+            Fabion
+          </h1>
+          <p className="text-[#9A9A9A] text-center max-w-sm mb-12 text-sm">
+            The intelligence that works, not waits. Built for thinking, creating, and executing.
+          </p>
+          <div className="flex gap-4">
+            
+              href="#models"
+              className="px-8 py-3 bg-white text-black text-[10px] uppercase tracking-widest font-bold rounded-full hover:scale-105 transition-transform"
+            >
+              Start Building
+            </a>
+          </div>
+        </section>
 
-            <div className="border border-neutral-200 p-10 bg-white/50 h-80 flex flex-col justify-end rounded-lg">
-              <h3
-                className="text-3xl mb-3"
-                style={{ fontFamily: "'EB Garamond', serif" }}
+        <section id="models" className="py-32 px-8 max-w-6xl mx-auto border-t border-[#1f1f1f]">
+          <h2 className="text-4xl italic mb-20" style={{ fontFamily: "'EB Garamond', serif" }}>
+            Three models. One intelligence.
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { name: "Thread", desc: "Ultra-fast reasoning for quick, direct answers." },
+              { name: "Pixel", desc: "Sharp, structured, and precise — built for code." },
+              { name: "Cell", desc: "Creative, multi-step reasoning for complex problems." },
+            ].map((model) => (
+              <div
+                key={model.name}
+                className="p-8 border border-[#1f1f1f] rounded-2xl hover:border-white/20 transition-all bg-[#0e0e0e]"
               >
-                Modular SDK
-              </h3>
-              <p className="text-sm text-neutral-500">
-                Connectors for every workflow. Plug-and-play integrations with
-                your stack.
-              </p>
-            </div>
-
-            <div className="border border-neutral-200 p-10 bg-white/50 h-80 flex flex-col justify-end rounded-lg">
-              <h3
-                className="text-3xl mb-3"
-                style={{ fontFamily: "'EB Garamond', serif" }}
-              >
-                Vibe Driven
-              </h3>
-              <p className="text-sm text-neutral-500">
-                An interface optimized for the "vibe coding" era—clean,
-                focused, and intuitive.
-              </p>
-            </div>
-
-            <div className="md:col-span-2 border border-neutral-200 p-10 bg-neutral-900 text-white h-80 flex flex-col justify-end rounded-lg">
-              <h3
-                className="text-3xl mb-3 text-neutral-100"
-                style={{ fontFamily: "'EB Garamond', serif" }}
-              >
-                Ready to build?
-              </h3>
-              <p className="text-sm text-neutral-400">
-                Join the Fabion beta and start architecting your first
-                autonomous agent.
-              </p>
-            </div>
-          </section>
-
-          {/* Waitlist */}
-          <section id="waitlist" className="border-t border-neutral-200 pt-24">
-            <div className="max-w-2xl">
-              <h2
-                className="text-4xl mb-8"
-                style={{ fontFamily: "'EB Garamond', serif" }}
-              >
-                Join the Waitlist
-              </h2>
-              <p className="text-lg text-neutral-600 mb-8 leading-relaxed">
-                We're onboarding new builders in cohorts. Secure your spot in
-                the queue and get priority access to the SDK.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@address.com"
-                  className="border border-neutral-200 bg-transparent px-6 py-3 rounded-full w-full sm:w-64 text-sm focus:outline-none focus:border-neutral-400 transition-colors"
-                />
-                <button className="bg-neutral-900 text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-neutral-700 transition-all w-full sm:w-auto">
-                  Request Access
+                <h3 className="text-2xl mb-4" style={{ fontFamily: "'EB Garamond', serif" }}>
+                  {model.name}
+                </h3>
+                <p className="text-[#9A9A9A] text-sm leading-relaxed mb-8">{model.desc}</p>
+                <div className="w-full h-[1px] bg-[#1f1f1f] mb-6" />
+                <button className="text-[10px] uppercase tracking-widest text-[#9A9A9A] hover:text-white transition-colors">
+                  Explore →
                 </button>
               </div>
-            </div>
-          </section>
-        </main>
+            ))}
+          </div>
+        </section>
 
-        <footer className="pb-12 text-center text-[10px] uppercase tracking-widest text-neutral-400">
-          © 2026 Fabion — Agentic Intelligence Infrastructure
+        <section id="features" className="py-32 px-8 max-w-6xl mx-auto border-t border-[#1f1f1f]">
+          <h2 className="text-4xl italic mb-20" style={{ fontFamily: "'EB Garamond', serif" }}>
+            Designed to disappear.
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-12">
+            {["Reasoning", "Code", "Research", "Automation", "Memory", "Multi-chat"].map((feat, i) => (
+              <div key={i} className="space-y-4">
+                <div className="w-10 h-10 border border-[#1f1f1f] rounded-full flex items-center justify-center">
+                  <span className="text-xs text-[#9A9A9A]">0{i + 1}</span>
+                </div>
+                <h4 className="text-lg font-medium">{feat}</h4>
+                <p className="text-[#9A9A9A] text-sm">Engineered for high-throughput intelligent processing.</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="demo" className="py-32 px-8">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl italic mb-12" style={{ fontFamily: "'EB Garamond', serif" }}>
+              Engineered to execute.
+            </h2>
+            <div className="bg-[#0c0c0c] border border-[#1f1f1f] p-8 rounded-2xl font-mono text-sm shadow-2xl overflow-hidden">
+              <div className="flex gap-2 mb-6">
+                <div className="w-3 h-3 rounded-full bg-[#1f1f1f]" />
+                <div className="w-3 h-3 rounded-full bg-[#1f1f1f]" />
+                <div className="w-3 h-3 rounded-full bg-[#1f1f1f]" />
+              </div>
+              <div className="space-y-2 opacity-80">
+                <p className="text-blue-400">$ Fabion — Thread 1.0</p>
+                <p className="text-green-400 mt-4">&gt; Analyzing request...</p>
+                <p className="text-green-400">&gt; Reasoning started...</p>
+                <p className="text-green-400">&gt; Response ready: 0.4s</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="subscribe" className="py-32 px-8 text-center bg-[#0d0d0d]">
+          <h2 className="text-6xl italic mb-8" style={{ fontFamily: "'EB Garamond', serif" }}>
+            Build with Fabion.
+          </h2>
+          <p className="text-[#9A9A9A] max-w-md mx-auto mb-12 text-sm">
+            Sign up to start chatting with Thread, Pixel, and Cell today.
+          </p>
+          <button
+            onClick={() => {
+              setAuthMode(true);
+              setAuthOpen(true);
+            }}
+            className="px-8 py-3 bg-white text-black text-[10px] uppercase tracking-widest font-bold rounded-full hover:scale-105 transition-transform"
+          >
+            Get Started
+          </button>
+        </section>
+
+        <footer className="py-20 border-t border-[#1f1f1f] text-center text-[#444] text-[10px] uppercase tracking-widest">
+          <p>© 2026 Fabion. All rights reserved.</p>
         </footer>
 
-        <AuthModal
-          isOpen={authOpen}
-          onClose={() => setAuthOpen(false)}
-          startInSignUp={authMode}
-        />
+        <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} startInSignUp={authMode} />
       </div>
     </>
   );
