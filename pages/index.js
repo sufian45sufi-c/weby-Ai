@@ -4,10 +4,10 @@ import AuthModal from "../components/AuthModal";
 
 function ModelCard({ logo, name, description }) {
   return (
-    <div className="flex flex-col items-center">
-      <img src={logo} alt={name} className="w-28 h-28 object-contain" />
-      <div className="w-px h-8 bg-[#333]" />
-      <div className="w-full p-6 border border-[#1f1f1f] rounded-2xl bg-[#0e0e0e] hover:border-white/20 transition-all text-center">
+    <div className="flex items-center gap-6">
+      <img src={logo} alt={name} className="w-40 h-40 object-contain shrink-0" />
+      <div className="h-24 w-px bg-[#333] shrink-0" />
+      <div className="flex-1 p-6 border border-[#1f1f1f] rounded-2xl bg-[#0e0e0e] hover:border-white/20 transition-all">
         <h3 className="text-2xl mb-3" style={{ fontFamily: "'EB Garamond', serif" }}>
           {name}
         </h3>
@@ -120,11 +120,11 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="models" className="py-32 px-8 max-w-6xl mx-auto border-t border-[#1f1f1f]">
+        <section id="models" className="py-32 px-8 max-w-4xl mx-auto border-t border-[#1f1f1f]">
           <h2 className="text-4xl italic mb-20" style={{ fontFamily: "'EB Garamond', serif" }}>
             Three models. One intelligence.
           </h2>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="flex flex-col gap-10">
             <ModelCard
               logo="/thread-logo.png"
               name="Thread"
