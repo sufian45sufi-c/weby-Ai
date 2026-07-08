@@ -1,6 +1,7 @@
 import Head from "next/head";
 import { useState, useEffect } from "react";
 import AuthModal from "../components/AuthModal";
+import WorkspaceShowcase from "../components/WorkspaceShowcase";
 
 function ModelRow({ logo, name, description, reverse }) {
   return (
@@ -208,19 +209,7 @@ export default function Home() {
             <h2 className="text-3xl italic mb-12" style={{ fontFamily: "'EB Garamond', serif" }}>
               Engineered to execute.
             </h2>
-            <div className="bg-black border border-[#1f1f1f] p-8 rounded-2xl font-mono text-sm shadow-2xl overflow-hidden">
-              <div className="flex gap-2 mb-6">
-                <div className="w-3 h-3 rounded-full bg-[#1f1f1f]" />
-                <div className="w-3 h-3 rounded-full bg-[#1f1f1f]" />
-                <div className="w-3 h-3 rounded-full bg-[#1f1f1f]" />
-              </div>
-              <div className="space-y-2 opacity-80">
-                <p className="text-blue-400">$ Fabion — Thread 1.0</p>
-                <p className="text-green-400 mt-4">&gt; Analyzing request...</p>
-                <p className="text-green-400">&gt; Reasoning started...</p>
-                <p className="text-green-400">&gt; Response ready: 0.4s</p>
-              </div>
-            </div>
+            <WorkspaceShowcase />
           </div>
         </section>
 
