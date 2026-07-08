@@ -104,7 +104,7 @@ export default function Home() {
           id="hero"
           className="relative min-h-screen flex flex-col justify-center items-center px-6 overflow-hidden"
           style={{
-            backgroundImage: "url('/hero-bg.webp')",
+            backgroundImage: "url('/hero-bg.png')",
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
