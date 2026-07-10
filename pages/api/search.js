@@ -9,38 +9,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch(
-      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`
-    );
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: process.env.TAVILY_API_KEY,
+        query,
+        search_depth: "basic",
+        max_results: 5,
+      }),
+    });
 
     if (!response.ok) {
       return res.status(200).json({ results: [], error: "Search unavailable right now." });
     }
 
     const data = await response.json();
-    const results = [];
+    const results = (data.results || []).slice(0, 5).map((r) => ({
+      title: r.title,
+      url: r.url,
+      snippet: r.content,
+    }));
 
-    if (data.AbstractText) {
-      results.push({
-        title: data.Heading || query,
-        url: data.AbstractURL || "",
-        snippet: data.AbstractText,
-      });
-    }
-
-    if (Array.isArray(data.RelatedTopics)) {
-      data.RelatedTopics.slice(0, 4).forEach((topic) => {
-        if (topic.Text && topic.FirstURL) {
-          results.push({
-            title: topic.Text.split(" - ")[0],
-            url: topic.FirstURL,
-            snippet: topic.Text,
-          });
-        }
-      });
-    }
-
-    res.status(200).json({ results: results.slice(0, 5) });
+    res.status(200).json({ results });
   } catch (err) {
     console.error(err);
     res.status(200).json({ results: [], error: "Search failed." });
