@@ -570,9 +570,10 @@ export default function Chat() {
           </header>
 
           <div
-            className={`flex-1 overflow-y-auto px-6 py-8 flex flex-col items-center ${
+            className={`flex-1 overflow-y-auto px-6 py-8 flex flex-col items-center scroll-smooth ${
               messages.length === 0 ? "justify-center" : ""
             }`}
+            style={{ scrollbarGutter: "stable", overscrollBehavior: "contain" }}
           >
             <div className="max-w-3xl w-full space-y-8">
               {messages.length === 0 && (
