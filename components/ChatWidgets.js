@@ -77,14 +77,15 @@ export function FormattedText({ text, images, onOpenWorkspace }) {
           {images.slice(0, 4).map((img, i) => {
             const src = typeof img === "string" ? img : img?.url || img?.src || "";
             if (!src) return null;
+            const proxiedSrc = `/api/image-proxy?url=${encodeURIComponent(src)}`;
             return (
               <div key={i} className="w-full h-32 rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900">
                 <img
-                  src={src}
+                  src={proxiedSrc}
                   alt=""
                   className="w-full h-full object-cover"
                   loading="lazy"
-                  referrerPolicy="no-referrer"
+                  onError={(e) => (e.target.parentElement.style.display = "none")}
                 />
               </div>
             );
