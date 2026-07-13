@@ -9,19 +9,50 @@ export const config = {
 
 const activeSandboxes = global.__fabionSandboxes || (global.__fabionSandboxes = new Map());
 
+const PACKAGE_JSON = JSON.stringify(
+  {
+    name: "fabion-browser-sandbox",
+    version: "1.0.0",
+    dependencies: { "playwright-core": "1.47.0" },
+  },
+  null,
+  2
+);
+
 async function getOrCreateSandbox(sessionId) {
   const existing = activeSandboxes.get(sessionId);
   if (existing) return existing.sandbox;
 
   const sandbox = await Sandbox.create({ timeout: 300_000 });
 
+  await sandbox.writeFiles([
+    { path: "package.json", content: Buffer.from(PACKAGE_JSON, "utf-8") },
+  ]);
+
+  // Install locally (not -g), so `require('playwright-core')` resolves correctly
+  // relative to the script's working directory.
   const install = await sandbox.runCommand({
     cmd: "npm",
-    args: ["install", "-g", "playwright-core"],
+    args: ["install"],
   });
 
   if (install.exitCode !== 0) {
-    throw new Error("Failed to install playwright-core in sandbox: " + (await install.stderr()));
+    const errText = await install.stderr();
+    throw new Error("Failed to install playwright-core: " + errText.slice(0, 800));
+  }
+
+  // Playwright's Chromium binary must also be downloaded — playwright-core alone
+  // doesn't bundle it. Install it via the playwright CLI that ships with playwright-core.
+  const installBrowser = await sandbox.runCommand({
+    cmd: "npx",
+    args: ["playwright", "install", "--with-deps", "chromium"],
+  });
+
+  if (installBrowser.exitCode !== 0) {
+    const errText = await installBrowser.stderr();
+    console.error("Chromium install warning:", errText.slice(0, 800));
+    // Don't throw here — some sandboxes may already have a compatible browser cached,
+    // and --with-deps can fail on permissions while the browser itself still installs fine.
   }
 
   activeSandboxes.set(sessionId, { sandbox, createdAt: Date.now() });
@@ -63,6 +94,21 @@ const action = JSON.parse(process.argv[2]);
 })();
 `;
 
+// Ensures a valid URL — the AI sometimes sends a search phrase instead of a real URL,
+// which previously caused "Navigating to https://Fifa world cup..." nonsense.
+function normalizeUrl(input) {
+  if (!input) return null;
+  let url = input.trim();
+
+  // If it already looks like a domain/URL, just ensure the protocol
+  if (/^https?:\/\//i.test(url)) return url;
+  if (/^[a-z0-9-]+\.[a-z]{2,}(\/.*)?$/i.test(url)) return "https://" + url;
+
+  // Otherwise this looks like a search phrase, not a URL — route it through a real search
+  // engine's query URL instead of failing outright.
+  return "https://www.google.com/search?q=" + encodeURIComponent(url);
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -72,6 +118,13 @@ export default async function handler(req, res) {
 
   if (!sessionId || !action) {
     return res.status(400).json({ error: "sessionId and action are required" });
+  }
+
+  if (action.type === "navigate") {
+    action.url = normalizeUrl(action.url);
+    if (!action.url) {
+      return res.status(200).json({ error: "No valid URL provided to navigate to." });
+    }
   }
 
   try {
